@@ -1,0 +1,6 @@
+# dsh-voice-input: client-only feature, but the bundle must contribute one
+# host row for the Loader to carry it (and therefore for the client scan to
+# see its dsh.client declaration). The host half is a no-op plugin.
+- insert:
+    - id: dsh-voice-input
+      name: dsh-voice-input-cloud

@@ -1,0 +1,42 @@
+# npm / packaging
+node_modules/
+package-lock.json
+*.tgz
+
+# Build output
+dist/
+target/
+
+# Runtime state that must never enter the repository. These live under the user
+# profile (%APPDATA%), not in this tree -- listed defensively so a stray copy
+# can never be committed by accident.
+voice-bridge.json
+voice-bridge.json.tmp
+state.json
+config.json
+paths.json
+*.backup-*
+dsh-web.log
+
+# Logs and OS noise
+*.log
+# Private captures, credentials, local reports, and test runtime directories
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.webm
+recordings/
+transcripts/
+runtime/
+private/
+artifacts/
+__pycache__/
+.DS_Store
+Thumbs.db

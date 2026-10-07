@@ -1,0 +1,32 @@
+diff --git a/apps/epicenter/src-tauri/src/recorder/blob.rs b/apps/epicenter/src-tauri/src/recorder/blob.rs
+index 5027966..71845c4 100644
+--- a/apps/epicenter/src-tauri/src/recorder/blob.rs
++++ b/apps/epicenter/src-tauri/src/recorder/blob.rs
+@@ -20,7 +20,7 @@
+ //! partial byte stream: incomplete capture has temporary staging state and no
+ //! permanent blob identity.
+ 
+-use std::fs::File;
++use std::fs::{File, OpenOptions};
+ use std::path::{Path, PathBuf};
+ use std::time::{SystemTime, UNIX_EPOCH};
+ 
+@@ -341,10 +341,15 @@ pub fn read_blob_samples(app: &AppHandle, id: &str) -> Result<Vec<f32>, Recorder
+ ///
+ /// By path rather than by handle because the writer that produced the file has
+ /// already been consumed by the time it is published: `hound`'s `finalize` takes
+-/// the writer by value. Opening read-only is enough, since `fsync` acts on the
+-/// file the descriptor names rather than on the descriptor's access mode.
++/// the writer by value. Opened read-write rather than read-only because Windows
++/// maps `sync_all` to `FlushFileBuffers`, which needs a write-capable handle
++/// (a read-only handle fails there with os error 5); POSIX `fsync` accepts
++/// either.
+ fn sync_file(path: &Path) -> Result<(), RecorderError> {
+-    File::open(path)
++    OpenOptions::new()
++        .read(true)
++        .write(true)
++        .open(path)
+         .and_then(|file| file.sync_all())
+         .map_err(|error| RecorderError::failed(format!("sync {}: {error}", path.display())))
+ }

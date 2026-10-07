@@ -1,0 +1,54 @@
+{
+  "name": "dsh-voice-input-cloud",
+  "version": "0.1.0",
+  "os": ["win32"],
+  "description": "Voice input for the DeepSeek Harness composer: a mic control in the composer tool row that records through the local Epicenter host and writes the transcript into the original session draft via the official InputActions API. Never submits.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh-TW.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "dsh": ">=0.1.7-rc.2"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "voice",
+    "speech-to-text",
+    "epicenter",
+    "composer"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    }
+  },
+  "author": "LatentHarbor-create",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LatentHarbor-create/dsh-voice-input-cloud.git",
+    "directory": "dsh-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/issues"
+  }
+}

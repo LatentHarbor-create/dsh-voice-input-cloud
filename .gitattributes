@@ -1,0 +1,5 @@
+# `git apply` matches context lines byte-for-byte, so the upstream patches must keep
+# their line endings exactly as produced -- never let a checkout convert them.
+* text=auto eol=lf
+*.patch -text
+*.bat text eol=crlf

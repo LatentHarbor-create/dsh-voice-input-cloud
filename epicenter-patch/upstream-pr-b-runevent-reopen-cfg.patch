@@ -1,0 +1,16 @@
+diff --git a/apps/epicenter/src-tauri/src/lib.rs b/apps/epicenter/src-tauri/src/lib.rs
+index 6c2d42c..8f9b75d 100644
+--- a/apps/epicenter/src-tauri/src/lib.rs
++++ b/apps/epicenter/src-tauri/src/lib.rs
+@@ -819,6 +819,11 @@ pub fn run() {
+         .build(tauri::generate_context!())
+         .expect("failed to build Epicenter")
+         .run(|app, event| match event {
++            // `Reopen` is the macOS Dock re-click: a variant that only exists
++            // on macOS. Gating the arm keeps `cargo check`/`cargo build` green
++            // on Windows and Linux, where the catch-all below already covers
++            // every variant this build sees.
++            #[cfg(target_os = "macos")]
+             RunEvent::Reopen { .. } => request_window(app, BuiltInApp::Home),
+             RunEvent::Exit => shutdown_host(app),
+             _ => {}

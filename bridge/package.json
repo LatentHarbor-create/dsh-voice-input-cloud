@@ -1,0 +1,48 @@
+{
+  "name": "dsh-voice-bridge",
+  "version": "0.1.0",
+  "os": ["win32"],
+  "description": "Local loopback HTTP bridge between the DeepSeek Harness voice-input plugin and the Epicenter desktop host's voice surface: record, fetch the WAV, transcribe on Groq or any OpenAI-compatible endpoint, optionally polish. Zero dependencies, 127.0.0.1 only.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./bridge.mjs",
+  "bin": {
+    "dsh-voice-bridge": "./bridge.mjs"
+  },
+  "exports": {
+    ".": "./bridge.mjs"
+  },
+  "files": [
+    "bridge.mjs",
+    "README.md",
+    "README.zh-TW.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "voice",
+    "speech-to-text",
+    "epicenter",
+    "whisper",
+    "groq",
+    "bridge",
+    "localhost"
+  ],
+  "scripts": {
+    "start": "node bridge.mjs",
+    "check": "node --check bridge.mjs"
+  },
+  "author": "LatentHarbor-create",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LatentHarbor-create/dsh-voice-input-cloud.git",
+    "directory": "bridge"
+  },
+  "bugs": {
+    "url": "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/issues"
+  }
+}
