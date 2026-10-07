@@ -13,6 +13,7 @@ target/
 voice-bridge.json
 voice-bridge.json.tmp
 state.json
+recording-owners/
 config.json
 paths.json
 *.backup-*

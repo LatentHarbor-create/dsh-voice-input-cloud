@@ -19,7 +19,7 @@ own API key, and writes the text into the *same* draft you were typing — it ne
 - **Keep control of your draft:** transcription is inserted without sending, and manual
   edits made during recording are preserved.
 
-This repository is the release-prep tree for three artifacts:
+This repository is the source tree for the components below:
 
 ```
 DSH web plugin (mic button, composer slot)
@@ -35,7 +35,7 @@ DSH web plugin (mic button, composer slot)
 
 | # | Path | npm package | License | What it is |
 |---|------|-------------|---------|------------|
-| 1 | [`bridge/`](bridge/) | `dsh-voice-bridge` | MIT | Single-file, zero-dependency Node ≥ 18 HTTP bridge on `127.0.0.1:39152` |
+| 1 | [`bridge/`](bridge/) | `dsh-voice-bridge` | MIT | Zero-dependency Node ≥ 18 HTTP bridge on `127.0.0.1:39152` |
 | 2 | [`dsh-plugin/`](dsh-plugin/) | `dsh-voice-input-cloud` | MIT | DSH client plugin (mic control in the composer) |
 | 3 | [`epicenter-patch/`](epicenter-patch/) | — | **AGPL-3.0** | Patch for the Epicenter desktop host: adds the loopback voice-bridge surface and fixes two upstream bugs |
 | 4 | [`launcher/`](launcher/) | — | MIT | Windows BAT/PowerShell/Node setup wizard and one-click service launcher, included in source |
@@ -53,9 +53,9 @@ the browser pairing token are separate local credentials. The bridge binds loopb
 
 ## Distribution
 
-**v0.1.0 is an early Windows release on GitHub, not on npm registry.**
+**v0.1.1 is an early Windows release on GitHub, not on npm registry.**
 Download the reviewed source and two `.tgz` packages from the
-[GitHub Release](https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/tag/v0.1.0). No npm account is needed to download or install them.
+[GitHub Release](https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/tag/v0.1.1). No npm account is needed to download or install them.
 Package-name commands such as `npm install dsh-voice-bridge` are unavailable for this release.
 Use the [English release installation guide](docs/INSTALL_RELEASE.md), or its
 [Chinese version](docs/INSTALL_RELEASE.zh-TW.md). Source-only host build prerequisites remain.
@@ -86,7 +86,7 @@ that file on every upstream call, so restarting Epicenter never needs a bridge r
 ### 2. The bridge
 
 ```bash
-npm install -g "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.0/dsh-voice-bridge-0.1.0.tgz"
+npm install -g "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.1/dsh-voice-bridge-0.1.1.tgz"
 # Or from extracted source: npm install -g ./bridge
 dsh-voice-bridge                     # listens on http://127.0.0.1:39152
 ```

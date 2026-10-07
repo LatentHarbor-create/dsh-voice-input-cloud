@@ -22,9 +22,10 @@ export function writeStatus(path, value) {
 export function dshArguments(port) {
   return ['web', '--host', '127.0.0.1', '--port', String(port), '--no-open'];
 }
-export function startDetached(executable, args, env, spawnFn = spawn) {
+export function startDetached(executable, args, env, spawnFn = spawn, report = () => {}) {
   const child = spawnFn(executable, args, { cwd: dirname(executable), env, windowsHide: true, detached: true, stdio: 'ignore' });
-  child.on('error', () => { process.exitCode = 1; });
+  child.on('spawn', () => report({ ready: true, pid: child.pid }));
+  child.on('error', () => { report({ ready: false, reason: 'WorkerSpawnFailed' }); process.exitCode = 1; });
   child.unref();
   return child;
 }
@@ -95,8 +96,9 @@ function main() {
   env.PATH = (existsSync(bun) ? bun + ';' : '') + searchPath;
   delete env.NODE_OPTIONS;
   const role = argument('--role');
-  if (role === 'host') startDetached(settings.epicenterExe, [], env);
-  else if (role === 'bridge') startDetached(settings.nodeExe, [settings.bridgeEntry], env);
+  const report = value => { if (args.includes('--status')) writeStatus(argument('--status'), value); };
+  if (role === 'host') startDetached(settings.epicenterExe, [], env, spawn, report);
+  else if (role === 'bridge') startDetached(settings.nodeExe, [settings.bridgeEntry], env, spawn, report);
   else if (role === 'dsh' && args.includes('--status')) startDsh(settings, argument('--status'), args.includes('--no-browser'), { env });
   else throw new Error('InvalidRole');
 }

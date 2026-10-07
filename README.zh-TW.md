@@ -18,7 +18,7 @@
   詳見 [Groq 方案說明](https://console.groq.com/docs/billing-faqs)。
 - **保留草稿控制權**：轉錄只加入草稿、不自動送出，錄音中的手動修改也會保留。
 
-v0.1.0 採 GitHub 原始碼與 Release 下載包交付，**尚未上架 npm registry**。
+v0.1.1 採 GitHub 原始碼與 Release 下載包交付，**尚未上架 npm registry**。
 不需要 npm 帳號就能下載，亦可用 npm 安裝 Release 的 tgz 網址；目前不能以套件名稱
 直接安裝。詳見[中文發布安裝說明](docs/INSTALL_RELEASE.zh-TW.md)。問題回報使用 GitHub Issues。
 
@@ -46,7 +46,7 @@ v0.1.0 採 GitHub 原始碼與 Release 下載包交付，**尚未上架 npm regi
    ```
 
    也可直接在 `bridge/` 執行 `node bridge.mjs`。安裝本地 tgz 時，將來源路徑換成
-   `dsh-voice-bridge-0.1.0.tgz` 的實際路徑。
+   `dsh-voice-bridge-0.1.1.tgz` 的實際路徑。
 3. 編輯首次啟動產生的 `%APPDATA%\dsh-voice-bridge\config.json`，在本機填入轉錄設定。
 4. DSH 插件中心 → 新增插件，填入來源包 `dsh-plugin/` 的絕對路徑並啟用；本版不使用 npm 名稱安裝；
    也可依發布安裝說明用 Release 的 tgz 網址安裝到本機後，加入其目錄。詳見 [插件安裝說明](dsh-plugin/README.zh-TW.md)。

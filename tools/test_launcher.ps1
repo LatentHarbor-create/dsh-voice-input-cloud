@@ -108,16 +108,42 @@ $script:started = New-Object Collections.Generic.List[string]
 function Start-Worker { param($Paths,$Path,$Role,$StatusPath,$SkipBrowser) $script:started.Add($Role) }
 function Test-EpicenterRunning { param($Exe) return $true }
 function Get-BridgeHealth { param($Config) return $true }
+function Invoke-VoiceEnsureBackend {param($Paths,$Config,$Path)
+    if(-not(Get-BridgeHealth $Config)){Stop-Voice 'Synthetic backend not healthy'}
+}
 Invoke-Startup $paths $cfg $cfgPath $false $true | Out-Null
 Assert ($script:started.Count -eq 0) 'reuse'
 Invoke-Startup $paths $cfg $cfgPath $true $true | Out-Null
 Assert ($script:started.Count -eq 0) 'check-only'
 Pass 'reuse-services-and-read-only-check'
+$script:browserAttempts=0
+function Start-Process { $script:browserAttempts++;throw 'SYNTHETIC private browser failure' }
+Invoke-Startup $paths $cfg $cfgPath $false $false | Out-Null
+Assert ($script:browserAttempts -eq 1 -and $script:started.Count -eq 0) 'browser-failure-services-remain-ready'
+Pass 'existing-dsh-browser-open-failure-is-nonfatal'
 function Get-BridgeHealth { param($Config) return $false }
 function Start-Sleep { param($Milliseconds) }
 Expect-Failure { Invoke-Startup $paths $cfg $cfgPath $false $true } 'health-failure'
 Assert ($script:started.Count -eq 0) 'no-dsh-on-failed-health'
 Pass 'failed-health-blocks-dsh-without-stopping-services'
+# Exercise the missing-DSH branch, including typed launcher Status switch regression.
+function Get-BridgeHealth { param($Config) return $true }
+function Invoke-VoiceEnsureBackend {param($Paths,$Config,$Path)
+    if(-not(Get-BridgeHealth $Config)){Stop-Voice 'Synthetic backend not healthy'}
+}
+function Assert-PortOwner { param($Port,$Entry,$NodeExe) return ($Port -eq 39152 -or $script:dshAnnounced) }
+$script:dshAnnounced=$false
+function Start-Worker {
+    param($Paths,$Path,$Role,$StatusPath,$SkipBrowser)
+    if($Role -eq 'dsh'){
+        $script:dshAnnounced=$true
+        [IO.File]::WriteAllText($StatusPath,'{"ready":true,"browserOpened":false}')
+    }else{throw 'Unexpected synthetic backend start'}
+}
+Invoke-Startup $paths $cfg $cfgPath $false $true | Out-Null
+Assert $script:dshAnnounced 'missing-dsh-started'
+Assert (@(Get-ChildItem -LiteralPath $suite -Filter 'launch-*.json').Count -eq 0) 'dsh-status-file-removed'
+Pass 'missing-dsh-startup-status-path-without-switch-variable-collision'
 # Test real setup logic with synthetic files and mocked interactive answers.
 $hostPath = Join-Path $suite 'host.exe'; [IO.File]::WriteAllText($hostPath, 'synthetic-not-an-executable')
 $dshPath = Join-Path $suite 'cli.js'; [IO.File]::WriteAllText($dshPath, '// synthetic')

@@ -1,3 +1,6 @@
+> Historical snapshot of the 2026-10-07 pre-publication test pass. Its planned publication
+> statements describe that earlier state. For v0.1.1, see [current service-control validation](VALIDATION_SERVICE_CONTROL.md).
+
 > Historical pre-publication review dated 2026-10-07. Subsequent release authorization
 > uses GitHub source/assets only. npm publication is deferred. Public author name is the
 > approved handle, with an empty commit email field. See the release installation guide.

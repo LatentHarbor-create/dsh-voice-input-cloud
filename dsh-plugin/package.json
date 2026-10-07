@@ -1,6 +1,6 @@
 {
   "name": "dsh-voice-input-cloud",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "os": ["win32"],
   "description": "Voice input for the DeepSeek Harness composer: a mic control in the composer tool row that records through the local Epicenter host and writes the transcript into the original session draft via the official InputActions API. Never submits.",
   "license": "MIT",

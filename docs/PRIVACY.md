@@ -20,9 +20,13 @@ the second provider receives the raw transcript and system prompt. The optional 
 does not enable audio transcription by itself. A provider or model shown as a software default
 does not disclose a maintainer's private configuration.
 
-Epicenter owns the recording files and can persist WAV blobs in its data directory. This plugin
-does not automatically remove those host recordings. Keep that directory out of release and
-support bundles even though the Node bridge only forwards audio in memory.
+Epicenter owns the recording files and can persist WAV blobs in its data directory. The bridge
+marks recordings started by this plugin using local ownership files. The Windows launcher
+clears only marked plugin WAVs/history on a fully stopped Start or Restart; partial recovery
+and repeated healthy Start defer cleanup. Unmarked recordings remain. Starting the services
+manually bypasses launcher cleanup. See [the retention policy](../launcher/README.md#history-removal-on-startrestart).
+Keep both the host data and ownership-marker directories out of release/support bundles;
+markers contain local paths even though they contain no audio, transcripts or keys.
 
 Do not copy `%APPDATA%\dsh-voice-bridge\config.json`, `state.json`, Epicenter's `voice-bridge.json`,
 browser localStorage, recorded blobs or installed-process logs into this repository. The

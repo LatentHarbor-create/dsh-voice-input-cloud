@@ -22,6 +22,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { homedir } from 'node:os';
+import { registerRecordingOwnership, removeRecordingOwnership } from './recording-history.mjs';
 
 const APPDATA = process.env.APPDATA || join(homedir(), 'AppData', 'Roaming');
 const CONFIG_DIR = join(APPDATA, 'dsh-voice-bridge');
@@ -33,6 +34,7 @@ if (EPICENTER_DATA_DIR && !isAbsolute(EPICENTER_DATA_DIR)) {
 }
 const EPICENTER_DISCOVERY_PATH = join(
   EPICENTER_DATA_DIR || join(APPDATA, 'so.epicenter'), 'voice-bridge.json');
+const EPICENTER_BLOB_ROOT = join(EPICENTER_DATA_DIR || join(APPDATA, 'so.epicenter'), 'blobs');
 const LISTEN_PORT = 39152;
 const UPSTREAM_TIMEOUT_MS = 30_000;
 const TRANSCRIBE_TIMEOUT_MS = 180_000;
@@ -419,6 +421,15 @@ async function main() {
         }
         if (up.status === 200 && up.body?.recordingId) {
           await saveTrackedId(up.body.recordingId);
+          try {
+            await registerRecordingOwnership(CONFIG_DIR, EPICENTER_BLOB_ROOT, up.body.recordingId);
+          } catch {
+            const cancelled = await upstreamCall('POST', '/cancel', {
+              requestId: body.requestId + '-history-failed', recordingId: up.body.recordingId,
+            }, UPSTREAM_TIMEOUT_MS);
+            if (cancelled.status === 200) await saveTrackedId(null);
+            return send(503, { error: { code: 'HistoryUnavailable', message: 'Recording ownership could not be saved; retry after checking local permissions.' } });
+          }
         }
         console.log(`[voice-bridge] state: start [${requestIdBase}] -> ${up.status}`);
         return send(up.status, up.body);
@@ -431,7 +442,10 @@ async function main() {
       }
       if (req.url === '/cancel') {
         const up = await upstreamCall('POST', '/cancel', body, UPSTREAM_TIMEOUT_MS);
-        if (up.status === 200) await saveTrackedId(null);
+        if (up.status === 200) {
+          await saveTrackedId(null);
+          try { await removeRecordingOwnership(CONFIG_DIR, body.recordingId); } catch { /* Retained marker is safe for startup cleanup. */ }
+        }
         console.log(`[voice-bridge] state: cancel [${requestIdBase}] -> ${up.status}`);
         return send(up.status, up.body);
       }

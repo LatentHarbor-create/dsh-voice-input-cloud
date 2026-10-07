@@ -75,11 +75,24 @@ assert.ok(!JSON.stringify(failures).includes(loginValue));
 tests.push('failed-dsh-output-discarded-and-safe-status');
 let detachedOptions;
 const fake = new EventEmitter(); fake.unref = () => {};
-startDetached(process.execPath, [entry], {}, (exe, args, options) => { detachedOptions = options; return fake; });
+fake.pid = 42;
+const spawnReports = [];
+startDetached(process.execPath, [entry], {}, (exe, args, options) => { detachedOptions = options; return fake; }, value => spawnReports.push(value));
+fake.emit('spawn');
+assert.deepEqual(spawnReports, [{ ready: true, pid: 42 }]);
 assert.equal(detachedOptions.stdio, 'ignore');
 assert.equal(detachedOptions.windowsHide, true);
 assert.equal(detachedOptions.detached, true);
 tests.push('background-host-bridge-output-not-persisted');
+const failedFake = new EventEmitter(); failedFake.unref = () => {};
+const failedReports = [];
+startDetached(process.execPath, [entry], {}, () => failedFake, value => failedReports.push(value));
+failedFake.emit('error', new Error('SYNTHETIC-' + loginValue));
+assert.equal(process.exitCode, 1);
+process.exitCode = 0;
+assert.deepEqual(failedReports, [{ ready: false, reason: 'WorkerSpawnFailed' }]);
+assert.ok(!JSON.stringify(failedReports).includes(loginValue));
+tests.push('spawn-errors-report-safe-code-without-private-details');
 if (process.platform === 'win32') {
   const marker = join(root, 'detached-marker.json');
   const bridgeEntry = join(root, '獨立 bridge & stub.mjs');
@@ -87,13 +100,18 @@ if (process.platform === 'win32') {
   const paths = join(root, 'paths.json');
   writeFileSync(paths, JSON.stringify({nodeExe:process.execPath,epicenterExe:process.execPath,bridgeEntry,dshEntry:entry,dshPort:3080}));
   const helper = new URL('../launcher/launch-service.mjs', import.meta.url);
-  const worker = spawn(process.execPath, [fileURLToPath(helper), '--settings', paths, '--role', 'bridge'], {stdio:'ignore', windowsHide:true});
+  const acknowledgement = join(root, 'worker-status.json');
+  const worker = spawn(process.execPath, [fileURLToPath(helper), '--settings', paths, '--role', 'bridge', '--status', acknowledgement], {stdio:'ignore', windowsHide:true});
   const [code] = await once(worker, 'exit');
   assert.equal(code, 0);
   for (let attempt=0;attempt<30;attempt++) {
     try { readFileSync(marker); break; } catch { await new Promise(resolve => setTimeout(resolve,50)); }
   }
   assert.equal(readFileSync(marker, 'utf8'), '{}');
+  const ack = JSON.parse(readFileSync(acknowledgement, 'utf8'));
+  assert.equal(ack.ready, true);
+  assert.ok(Number.isInteger(ack.pid) && ack.pid > 0);
+  assert.ok(!readFileSync(acknowledgement, 'utf8').includes(loginValue));
   tests.push('actual-windows-detached-helper-with-synthetic-bridge');
   const invalidPaths = join(root, 'invalid-paths.json');
   writeFileSync(invalidPaths, JSON.stringify({nodeExe:process.execPath,epicenterExe:process.execPath,bridgeEntry,dshEntry:entry,dshPort:'3080'}));

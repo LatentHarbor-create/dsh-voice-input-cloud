@@ -1,16 +1,28 @@
 # Windows PowerShell 5.1+, Windows only. Keys are read interactively, never as arguments.
 [CmdletBinding()]
 param(
+    [switch]$Menu,
+    [ValidateSet('Start','Stop','Restart','Status')][string]$Action = 'Start',
+    [switch]$Stop,
+    [switch]$Restart,
+    [switch]$Status,
     [switch]$Configure,
     [switch]$SetupOnly,
     [switch]$Check,
     [switch]$NoBrowser,
-    [string]$SettingsPath = (Join-Path $env:LOCALAPPDATA 'dsh-voice-launcher\paths.json')
+    [string]$SettingsPath = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:LauncherDirectory = $PSScriptRoot
+$script:LauncherStep = 'Initialization'
+if (-not $PSBoundParameters.ContainsKey('SettingsPath')) {
+    # PS5.1 does not reliably populate PSScriptRoot while binding parameter defaults.
+    $besideLauncher = Join-Path $script:LauncherDirectory 'paths.json'
+    if ([IO.File]::Exists($besideLauncher)) { $SettingsPath = $besideLauncher }
+    else { $SettingsPath = Join-Path $env:LOCALAPPDATA 'dsh-voice-launcher\paths.json' }
+}
 
 function Stop-Voice([string]$Message) {
     $fault = New-Object InvalidOperationException($Message)
@@ -209,7 +221,7 @@ function Invoke-Setup([string]$Path, [string]$ConfigPath) {
 function Get-Listener([int]$Port) {
     # Include IPv6/other bindings: any listener may conflict; never kill by port.
     try {
-        return @(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalPort -eq $Port } | Select-Object -ExpandProperty OwningProcess -Unique)
+        return @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -ExpandProperty OwningProcess -Unique)
     } catch {
         if ($_.CategoryInfo.Category -eq 'ObjectNotFound') { return @() }
         Stop-Voice 'Cannot inspect local port owners. Check Windows permissions; no service was started.'
@@ -256,14 +268,40 @@ function Get-BridgeHealth($Config, [int]$Port = 39152) {
     } catch { return $false } finally { if ($null -ne $response) { $response.Dispose() } }
 }
 function Start-Worker($Paths, [string]$Path, [string]$Role, [string]$StatusPath, [bool]$SkipBrowser) {
+    $script:LauncherStep = 'Start worker: ' + $Role
     $worker = Join-Path $script:LauncherDirectory 'launch-service.mjs'
+    $acknowledgement = ''
+    if ($Role -in @('host','bridge')) {
+        $acknowledgement = Join-Path ([IO.Path]::GetDirectoryName($Path)) ('worker-' + [guid]::NewGuid().ToString('N') + '.json')
+        $StatusPath = $acknowledgement
+    }
     # All arguments are validated file paths or fixed strings; no shell evaluates them.
     $arguments = '"' + $worker + '" --settings "' + $Path + '" --role ' + $Role
     if ($StatusPath) { $arguments += ' --status "' + $StatusPath + '"' }
     if ($SkipBrowser) { $arguments += ' --no-browser' }
-    Start-Process -FilePath $Paths.nodeExe -ArgumentList $arguments -WindowStyle Hidden | Out-Null
+    $helper = $null
+    try {
+        try { $helper = Start-Process -FilePath $Paths.nodeExe -ArgumentList $arguments -WindowStyle Hidden -PassThru }
+        catch { Stop-Voice ('Cannot launch the ' + $Role + ' worker. Check the Node path and Windows permissions; run Status before retrying.') }
+        if ($acknowledgement) {
+            if (-not $helper.WaitForExit(8000)) { Stop-Voice ('The ' + $Role + ' worker did not finish launching. Run Status before retrying.') }
+            if ($helper.ExitCode -ne 0 -or -not [IO.File]::Exists($acknowledgement)) {
+                Stop-Voice ('The ' + $Role + ' worker failed before confirming startup. Check paths.json, Node and local permissions; run Status before retrying.')
+            }
+            $result = Read-JsonFile $acknowledgement
+            if ((Get-Field $result 'ready' $false) -ne $true) { Stop-Voice ('The ' + $Role + ' process could not be created. Run Status and check the executable locally.') }
+        }
+    } finally {
+        if ($null -ne $helper) { $helper.Dispose() }
+        if ($acknowledgement) {
+            foreach ($temporary in @($acknowledgement, ($acknowledgement + '.tmp'))) {
+                if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) }
+            }
+        }
+    }
 }
 function Invoke-Startup($Paths, $Config, [string]$Path, [bool]$InspectOnly, [bool]$SkipBrowser) {
+    $script:LauncherStep = 'Inspect startup processes'
     $bridgeRunning = Assert-PortOwner 39152 $Paths.bridgeEntry $Paths.nodeExe
     $dshRunning = Assert-PortOwner $Paths.dshPort $Paths.dshEntry $Paths.nodeExe
     if ($InspectOnly) {
@@ -272,25 +310,23 @@ function Invoke-Startup($Paths, $Config, [string]$Path, [bool]$InspectOnly, [boo
         else { Write-Host 'Bridge/Epicenter not ready yet; use normal launch to start them.' }
         return
     }
-    if (-not (Test-EpicenterRunning $Paths.epicenterExe)) { Start-Worker $Paths $Path 'host' '' $true }
-    if (-not $bridgeRunning) { Start-Worker $Paths $Path 'bridge' '' $true }
-    $healthy = $false
-    for ($attempt = 0; $attempt -lt 25; $attempt++) {
-        if (Get-BridgeHealth $Config) { $healthy = $true; break }
-        Start-Sleep -Milliseconds 600
-    }
-    if (-not $healthy) { Stop-Voice 'Bridge/Epicenter did not become healthy. Check the patched host, Bun runtime and local paths. Existing services were not stopped.' }
+    Invoke-VoiceEnsureBackend $Paths $Config $Path
     if ($dshRunning) {
-        if (-not $SkipBrowser) { Start-Process ('http://127.0.0.1:' + $Paths.dshPort + '/') | Out-Null }
+        $script:LauncherStep = 'Open existing DSH browser'
+        if (-not $SkipBrowser) {
+            try { Start-Process ('http://127.0.0.1:' + $Paths.dshPort + '/') -ErrorAction Stop | Out-Null }
+            catch { Write-Host ('Voice services are ready, but the browser could not be opened. Open http://127.0.0.1:' + $Paths.dshPort + '/ manually.') -ForegroundColor Yellow }
+        }
         Write-Host 'Existing DSH preserved. If login is required, use its existing authenticated tab or launch link.'
     } else {
-        $status = Join-Path ([IO.Path]::GetDirectoryName($Path)) ('launch-' + [guid]::NewGuid().ToString('N') + '.json')
+        $launchStatusPath = Join-Path ([IO.Path]::GetDirectoryName($Path)) ('launch-' + [guid]::NewGuid().ToString('N') + '.json')
         try {
-            Start-Worker $Paths $Path 'dsh' $status $SkipBrowser
+            Start-Worker $Paths $Path 'dsh' $launchStatusPath $SkipBrowser
+            $script:LauncherStep = 'Wait for DSH startup'
             $ready = $false
             for ($attempt = 0; $attempt -lt 50; $attempt++) {
-                if ([IO.File]::Exists($status)) {
-                    $result = Read-JsonFile $status
+                if ([IO.File]::Exists($launchStatusPath)) {
+                    $result = Read-JsonFile $launchStatusPath
                     if ((Get-Field $result 'ready' $false) -eq $true) { $ready = $true; break }
                     Stop-Voice 'DSH startup failed. Check its installation/version locally. No raw output or login token was recorded.'
                 }
@@ -302,13 +338,85 @@ function Invoke-Startup($Paths, $Config, [string]$Path, [bool]$InspectOnly, [boo
                 Write-Host 'DSH is running, but browser opening failed or timed out. Open its ordinary loopback URL; use an existing authenticated tab if available. No login token was printed.'
             }
         } finally {
-            if ([IO.File]::Exists($status)) { [IO.File]::Delete($status) }
+            if ([IO.File]::Exists($launchStatusPath)) { [IO.File]::Delete($launchStatusPath) }
         }
     }
     Write-Host 'Ready. Install/enable the voice plugin and pair the tab once as documented. No recording or cloud call was made.'
 }
+. (Join-Path $script:LauncherDirectory 'voice-control.ps1')
+. (Join-Path $script:LauncherDirectory 'voice-retention.ps1')
+
+function Get-VoiceMenuCommand([string]$Choice) {
+    switch ($Choice) {
+        '1' { return [pscustomobject]@{Action='Start';SetupOnly=$false} }
+        '2' { return [pscustomobject]@{Action='Stop';SetupOnly=$false} }
+        '3' { return [pscustomobject]@{Action='Restart';SetupOnly=$false} }
+        '4' { return [pscustomobject]@{Action='Status';SetupOnly=$false} }
+        '5' { return [pscustomobject]@{Action='Start';SetupOnly=$true} }
+        default { return $null }
+    }
+}
+function Invoke-VoiceMenuCommand($Command) {
+    # Fixed menu choices become structured native arguments; user input is never evaluated.
+    $arguments = @('-NoLogo','-NoProfile','-ExecutionPolicy','Bypass','-File',
+        (Join-Path $script:LauncherDirectory 'start-voice.ps1'),'-SettingsPath',$SettingsPath)
+    if ($Command.SetupOnly) { $arguments += '-SetupOnly' }
+    else { $arguments += @('-Action',$Command.Action) }
+    & powershell.exe @arguments
+    $script:MenuCommandExitCode = $LASTEXITCODE
+}
+function Invoke-VoiceMenu {
+    if ($Action -ne 'Start' -or $Stop -or $Restart -or $Status -or $Check -or $Configure -or $SetupOnly -or $NoBrowser) {
+        Stop-Voice 'Use Menu on its own, or select one command without Menu.'
+    }
+    while ($true) {
+        Write-Host ''
+        Write-Host '========== Voice services =========='
+        Write-Host '  1. Start services'
+        Write-Host '  2. Stop voice backend'
+        Write-Host '  3. Restart voice backend'
+        Write-Host '  4. Status'
+        Write-Host '  5. Settings (paths, keys, text polish)'
+        Write-Host '  0. Exit menu (services keep running)'
+        Write-Host 'Finish recording/transcription first. DSH and drafts are preserved.'
+        Write-Host 'Cold Start/Restart clears plugin-owned audio. Partial recovery keeps healthy services.'
+        $choice = (Read-Host 'Choose 0-5').Trim()
+        if ($choice -eq '0') { return }
+        $command = Get-VoiceMenuCommand $choice
+        if ($null -eq $command) {
+            Write-Host 'Enter a number from 0 to 5.' -ForegroundColor Yellow
+            continue
+        }
+        $script:MenuCommandExitCode = 0
+        Invoke-VoiceMenuCommand $command
+        if ($script:MenuCommandExitCode -eq 1) {
+            Write-Host 'Command failed; see the message above.' -ForegroundColor Yellow
+        } elseif ($script:MenuCommandExitCode -eq 2) {
+            Write-Host 'Services are not ready or conflicted.' -ForegroundColor Yellow
+        }
+        [void](Read-Host 'Press Enter to return to the menu')
+    }
+}
+
+function Resolve-LauncherAction {
+    $selected = @()
+    if ($Stop) { $selected += 'Stop' }
+    if ($Restart) { $selected += 'Restart' }
+    if ($Status -or $Check) { $selected += 'Status' }
+    if ($selected.Count -gt 1 -or ($selected.Count -gt 0 -and $Action -ne 'Start')) {
+        Stop-Voice 'Choose only one action: Start, Stop, Restart or Status.'
+    }
+    $resolved = $Action
+    if ($selected.Count -eq 1) { $resolved = $selected[0] }
+    if ($resolved -ne 'Start' -and ($Configure -or $SetupOnly -or $NoBrowser)) {
+        Stop-Voice 'Configure, SetupOnly and NoBrowser apply only to Start.'
+    }
+    return $resolved
+}
 function Invoke-Launcher {
+    $script:LauncherStep = 'Validate settings'
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { Stop-Voice 'This launcher supports Windows only. macOS/Linux are not supported in this release.' }
+    $selectedAction = Resolve-LauncherAction
     $path = [IO.Path]::GetFullPath($SettingsPath)
     $configPath = Join-Path $env:APPDATA 'dsh-voice-bridge\config.json'
     $hasher = [Security.Cryptography.SHA256]::Create()
@@ -319,24 +427,62 @@ function Invoke-Launcher {
     try {
         try { $locked = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked = $true }
         if (-not $locked) { Stop-Voice 'Another launcher/setup is running. Wait for it to finish.' }
+        if ($selectedAction -ne 'Start' -and -not [IO.File]::Exists($path)) {
+            Stop-Voice 'First-run settings are missing. Run the launcher normally or with -SetupOnly.'
+        }
         if ($Configure -or $SetupOnly -or -not [IO.File]::Exists($path)) {
-            if ($Check) { Stop-Voice 'First-run settings are missing. Run the launcher normally or with -SetupOnly.' }
             Invoke-Setup $path $configPath
         }
         if ($SetupOnly) { return }
-        $paths = Read-JsonFile $path; Assert-Paths $paths
+        $paths = Read-JsonFile $path; Assert-ControlPaths $paths
+        if ($selectedAction -eq 'Stop') { Invoke-VoiceStop $paths; return }
+        if ($selectedAction -eq 'Status') {
+            $config = $null
+            if ([IO.File]::Exists($configPath)) {
+                try { $config = Read-JsonFile $configPath; Assert-BridgeConfig $config }
+                catch { $config = $null }
+            }
+            $state = Show-VoiceStatus $paths $config
+            if (-not $state.healthy -or $state.conflict) { $script:LauncherExitCode = 2 }
+            return
+        }
+        # Validate startup requirements before stopping a running service for Restart.
+        Assert-Paths $paths
         $config = Read-JsonFile $configPath; Assert-BridgeConfig $config
         if ([string]::IsNullOrWhiteSpace((Get-Field $config.transcription 'apiKey' ''))) { Stop-Voice 'Speech key is missing. Run with -Configure.' }
         [void](Normalize-BaseURL (Get-Field $config.transcription 'baseURL' ''))
         if ([string]::IsNullOrWhiteSpace((Get-Field $config.transcription 'model' ''))) { Stop-Voice 'Speech model is missing. Run with -Configure.' }
-        Invoke-Startup $paths $config $path ([bool]$Check) ([bool]$NoBrowser)
+        $inventory=Get-StableVoiceInventory $paths
+        Assert-VoiceInventoryOwnership $inventory ($selectedAction -eq 'Start')
+        if ($selectedAction -eq 'Restart') {
+            $script:LauncherStep = 'Validate history and recording state'
+            Assert-NoActiveVoiceRecording $paths
+            [void](Get-VoiceHistoryPlan $paths)
+            $script:LauncherStep = 'Stop selected voice backend'
+            Invoke-VoiceStop $paths
+            $script:LauncherStep = 'Clear plugin-owned history'
+            Invoke-VoiceHistoryCleanup $paths
+            Invoke-VoiceBackendStart $paths $config $path
+        } else {
+            # Cold startup can purge safely. Partial recovery must not stop healthy
+            # components or remove audio that an existing component could be using.
+            if($inventory.hosts.Count -eq 0 -and $inventory.bridges.Count -eq 0) {
+                $script:LauncherStep='Clear plugin-owned history before cold startup'
+                Invoke-VoiceHistoryCleanup $paths
+            } else { Write-Host 'Existing voice components will be checked and kept if healthy. History cleanup is deferred until Restart or a fully stopped Start.' }
+            Invoke-Startup $paths $config $path $false ([bool]$NoBrowser)
+        }
     } finally { if ($locked) { $mutex.ReleaseMutex() }; $mutex.Dispose() }
 }
 if ($MyInvocation.InvocationName -ne '.') {
-    try { Invoke-Launcher; exit 0 }
+    $script:LauncherExitCode = 0
+    try {
+        if ($Menu) { Invoke-VoiceMenu } else { Invoke-Launcher }
+        exit $script:LauncherExitCode
+    }
     catch {
         # Fixed actionable messages only. Never print arbitrary OS/provider exception details.
-        $message = 'Launcher failed. Check local installation and permissions; no private diagnostics were printed.'
+        $message = 'Launcher failed during: ' + $script:LauncherStep + '. Run Status before retrying. No private diagnostics were printed.'
         $fault = $_.Exception
         while ($null -ne $fault) {
             if ($fault.Data.Contains('VoiceLauncherSafe')) { $message = $fault.Message; break }

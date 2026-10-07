@@ -21,7 +21,7 @@ FORBIDDEN_SUFFIXES = {
     '.pem', '.key', '.p12', '.pfx', '.sqlite', '.sqlite3', '.db',
     '.png', '.jpg', '.jpeg', '.gif', '.pdf', '.docx', '.zip', '.tgz', '.gz', '.pyc',
 }
-PRIVATE_DIRS = {'recordings', 'transcripts', 'runtime', 'private', 'node_modules', 'target', 'artifacts'}
+PRIVATE_DIRS = {'recordings', 'recording-owners', 'transcripts', 'runtime', 'private', 'node_modules', 'target', 'artifacts'}
 PATTERNS = {
     'vendor-key': re.compile(r'(?:gsk_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AIza[A-Za-z0-9_-]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16})'),
     'jwt': re.compile(r'\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'),
@@ -117,11 +117,16 @@ def scan_history():
 
 def check_archives(directory):
     results, findings = {}, []
+    bridge_version = json.loads((ROOT / 'bridge/package.json').read_text(encoding='utf-8'))['version']
+    plugin_version = json.loads((ROOT / 'dsh-plugin/package.json').read_text(encoding='utf-8'))['version']
+    if not all(isinstance(v, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?', v)
+               for v in [bridge_version, plugin_version]):
+        raise ValueError('Invalid release version')
     specifications = {
-        'dsh-voice-bridge-0.1.0.tgz': ('bridge', {'package.json', 'README.md', 'README.zh-TW.md', 'LICENSE', 'bridge.mjs'}),
-        'dsh-voice-input-cloud-0.1.0.tgz': ('dsh-plugin', {'package.json', 'README.md', 'README.zh-TW.md', 'LICENSE', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js'}),
+        f'dsh-voice-bridge-{bridge_version}.tgz': ('bridge', {'package.json', 'README.md', 'README.zh-TW.md', 'LICENSE', 'bridge.mjs', 'recording-history.mjs'}),
+        f'dsh-voice-input-cloud-{plugin_version}.tgz': ('dsh-plugin', {'package.json', 'README.md', 'README.zh-TW.md', 'LICENSE', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js'}),
     }
-    allowed = set(specifications) | {'dsh-voice-input-cloud-0.1.0-source.tar.gz', 'SHA256SUMS', 'release-validation.json'}
+    allowed = set(specifications) | {f'dsh-voice-input-cloud-{plugin_version}-source.tar.gz', 'SHA256SUMS', 'release-validation.json'}
     for path in directory.rglob('*'):
         rel = path.relative_to(directory).as_posix()
         if path.is_symlink() or (path.is_file() and rel not in allowed):
@@ -154,7 +159,7 @@ def check_archives(directory):
             findings.append({'location': name, 'category': 'package-file-set-mismatch'})
         results[name] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), 'files': len(found), 'bytes': path.stat().st_size}
     # The source archive is optional; when supplied it must match every current file.
-    source = directory / 'dsh-voice-input-cloud-0.1.0-source.tar.gz'
+    source = directory / f'dsh-voice-input-cloud-{plugin_version}-source.tar.gz'
     if source.exists():
         expected_files, _ = scan_tree()
         found = set()
@@ -202,13 +207,17 @@ def main():
     commits, blobs, historical = scan_history()
     findings.extend(historical)
     syntax = []
-    for rel in ['bridge/bridge.mjs', 'dsh-plugin/lib/client.js', 'dsh-plugin/lib/index.js', 'launcher/launch-service.mjs']:
+    for rel in files:
+        if not rel.endswith(('.mjs', '.js')):
+            continue
         result = subprocess.run(['node', '--check', str(ROOT / rel)], capture_output=True)
         syntax.append({'file': rel, 'ok': result.returncode == 0})
         if result.returncode:
             findings.append({'location': rel, 'category': 'syntax-error'})
     if sys.platform == 'win32':
-        for rel in ['launcher/start-voice.ps1', 'tools/test_launcher.ps1']:
+        for rel in files:
+            if not rel.endswith('.ps1'):
+                continue
             env = dict(os.environ, DSH_RELEASE_PS1=str(ROOT / rel))
             code = '$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile($env:DSH_RELEASE_PS1,[ref]$t,[ref]$e);if($e.Count){exit 1}'
             result = subprocess.run(['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', code], env=env, capture_output=True)

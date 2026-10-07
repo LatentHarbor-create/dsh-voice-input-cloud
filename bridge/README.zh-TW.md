@@ -8,6 +8,12 @@ Voice Bridge 是零依賴的 Node ≥ 18 本機進程，監聽 `127.0.0.1:39152`
 它連接 DSH 插件與已套用 voice-bridge 補丁的 Epicenter host，取得 WAV 後呼叫
 雲端轉錄，並可選擇整理文字。bridge 在記憶體轉送音訊；Epicenter 自身仍可能保存錄音。
 
+`bridge.mjs` 與 `recording-history.mjs` 必須放在一起。每次成功開始錄音都會於
+`%APPDATA%/dsh-voice-bridge/recording-owners/` 保存 ID、owner 與音訊目錄標記，
+不含音訊、轉錄文字或 Key。[Windows 啟動器](../launcher/README.zh-TW.md)
+在啟動／重啟時只清理本插件標記的錄音，沒有標記的 WAV 保留。
+直接執行 `node bridge.mjs` 會保存標記，但不觸發啟動器清理。
+
 ## 安裝與啟動
 
 先建置並啟動包含完整補丁的 Epicenter host。此 npm 套件不包含 host。
@@ -18,8 +24,8 @@ npm install -g ./bridge
 dsh-voice-bridge
 ```
 
-也可將安裝路徑替換成 `dsh-voice-bridge-0.1.0.tgz`；從 GitHub Release 安裝可使用
-`npm install -g "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.0/dsh-voice-bridge-0.1.0.tgz"`。
+也可將安裝路徑替換成 `dsh-voice-bridge-0.1.1.tgz`；從 GitHub Release 安裝可使用
+`npm install -g "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.1/dsh-voice-bridge-0.1.1.tgz"`。
 預設手動啟動；安裝不會設定開機自啟、排程工作或 Windows 服務。語音按鈕不能
 自行喚醒 host 或 bridge。完整 source 包的 launcher/ 已提供含首次路徑／Key
 精靈的 BAT／PowerShell 啟動器；僅 bridge npm 套件不包含它，詳見 source 的

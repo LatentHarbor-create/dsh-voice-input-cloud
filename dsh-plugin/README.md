@@ -46,7 +46,7 @@ real key and do not reveal how any maintainer has configured their installation.
 
 ## Install
 
-v0.1.0 is distributed on GitHub Releases, not npm registry. Use extracted source or an
+v0.1.1 is distributed on GitHub Releases, not npm registry. Use extracted source or an
 installed Release tarball directory; package-name installation is not available yet.
 
 

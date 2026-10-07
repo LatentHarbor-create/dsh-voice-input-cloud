@@ -2,7 +2,7 @@
 
 [English](INSTALL_RELEASE.md) | **中文**
 
-只支援 Windows。本版由 [GitHub Release](https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/tag/v0.1.0) 提供原始碼與 tgz，**未上架 npm registry**。
+只支援 Windows。本版由 [GitHub Release](https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/tag/v0.1.1) 提供原始碼與 tgz，**未上架 npm registry**。
 下載與安裝不需要 npm 帳號。npm 工具仍可安裝 tgz 網址或本地檔案；不能只填套件名稱。
 本倉庫是 monorepo，也不要直接把倉庫根目錄當 npm 套件安裝。
 
@@ -19,9 +19,9 @@
 ## 可選：用 npm 安裝 GitHub tgz
 
 ```powershell
-npm install -g --ignore-scripts "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.0/dsh-voice-bridge-0.1.0.tgz"
+npm install -g --ignore-scripts "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.1/dsh-voice-bridge-0.1.1.tgz"
 $pluginRoot = Join-Path $env:LOCALAPPDATA 'dsh-cloud-plugin'
-npm install --prefix "$pluginRoot" --ignore-scripts "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.0/dsh-voice-input-cloud-0.1.0.tgz"
+npm install --prefix "$pluginRoot" --ignore-scripts "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.1/dsh-voice-input-cloud-0.1.1.tgz"
 ```
 
 在 DSH 插件中心加入 `$pluginRoot\node_modules\dsh-voice-input-cloud` 的實際絕對路徑。
@@ -34,3 +34,17 @@ npm install --prefix "$pluginRoot" --ignore-scripts "https://github.com/LatentHa
 這是早期版本。先前語音／整理實機驗收保留，最新連點鎖只有合成測試，完整新使用者
 首次安裝啟動器尚未驗收。詳見 FIRST_INSTALL_CHECK.md／VALIDATION.md。
 GitHub Issues 只提供版本、脫敏錯誤碼與合成重現步驟，勿附 Key、config、錄音、轉錄或完整日誌。
+
+## 從 v0.1.0 升級
+
+1. 先完成錄音與轉錄。必要時用新完整 source 的 **5 Settings** 指向現有 host／Bridge，
+   再選 **2 Stop** 停止該語音後端；DSH 及草稿保留。私密設定／備份勿公開。
+2. 用新 source 或 tgz 更新 Bridge，bridge.mjs 與 recording-history.mjs 必須放在一起。
+   新 source 的全部啟動器程式檔案也要一起更新，不能只替換 BAT。
+   既有 paths.json／config 保留在本機，勿納入 git。
+3. 解壓或安裝位置變更時，用 **5 Settings**／-SetupOnly 更新路徑；Enter 保留原有
+   Key、prompt 及配對，勿用公開範例覆蓋 config。插件路徑未變則不需重新配對。
+4. 選 **1 Start**，再用 **4 Status** 確認 host／後端健康。完整停止後的 Start 會清除
+   有插件標記的歷史；沒有標記的舊 WAV 仍保留。
+
+完整操作與清理規則見[啟動器說明](../launcher/README.zh-TW.md)。

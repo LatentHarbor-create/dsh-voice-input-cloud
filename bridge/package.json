@@ -1,6 +1,6 @@
 {
   "name": "dsh-voice-bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "os": ["win32"],
   "description": "Local loopback HTTP bridge between the DeepSeek Harness voice-input plugin and the Epicenter desktop host's voice surface: record, fetch the WAV, transcribe on Groq or any OpenAI-compatible endpoint, optionally polish. Zero dependencies, 127.0.0.1 only.",
   "license": "MIT",
@@ -14,6 +14,7 @@
   },
   "files": [
     "bridge.mjs",
+    "recording-history.mjs",
     "README.md",
     "README.zh-TW.md",
     "LICENSE"

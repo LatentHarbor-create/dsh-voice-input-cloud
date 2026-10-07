@@ -4,11 +4,17 @@
 
 **Windows only in this release. macOS/Linux are not supported.**
 
-A single-file, **zero-dependency** Node (≥ 18) HTTP bridge between the
+A **zero-dependency** Node (≥ 18) HTTP bridge between the
 DSH voice-input plugin in a browser tab and the **Epicenter** desktop host's
 loopback voice surface. It records, fetches the WAV, transcribes it on the cloud with *your*
 API key, optionally polishes the text, and hands it back. It never stores audio and never logs
 transcripts.
+
+Keep `bridge.mjs` and `recording-history.mjs` together. Each successful recording
+start saves an ID/owner/store marker under `%APPDATA%/dsh-voice-bridge/recording-owners/`.
+It contains no audio, transcript or API key. The [Windows launcher](../launcher/README.md)
+clears only marked plugin recordings on Start/Restart; unmarked WAVs are retained.
+Running `node bridge.mjs` directly saves markers but does not run launcher cleanup.
 
 ```
 DSH tab ──HTTP(127.0.0.1:39152, optional bearer)──▶ dsh-voice-bridge
@@ -19,12 +25,12 @@ dsh-voice-bridge ──HTTPS(your key)──▶ Groq / OpenAI-compatible /audio/
 
 ## Install
 
-v0.1.0 is distributed through GitHub Releases, not npm registry. No npm account is
+v0.1.1 is distributed through GitHub Releases, not npm registry. No npm account is
 needed; use the tarball URL below or an extracted local path, not the package name.
 
 
 ```bash
-npm install -g "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.0/dsh-voice-bridge-0.1.0.tgz"
+npm install -g "https://github.com/LatentHarbor-create/dsh-voice-input-cloud/releases/download/v0.1.1/dsh-voice-bridge-0.1.1.tgz"
 # Or from extracted source: npm install -g ./bridge
 dsh-voice-bridge                    # listens on http://127.0.0.1:39152
 ```

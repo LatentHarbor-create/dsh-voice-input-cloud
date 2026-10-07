@@ -27,6 +27,7 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertTrue(gate.inspect_bytes('paths.json', b'{}'))
         self.assertTrue(gate.inspect_bytes('settings.json.backup-synthetic', b'{}'))
         self.assertTrue(gate.inspect_bytes('private/notes.md', b'private'))
+        self.assertTrue(gate.inspect_bytes('recording-owners/synthetic.json', b'{}'))
 
     def test_examples_and_interpolation_are_allowed(self):
         for value in ['', '<YOUR_API_KEY>', '...', '${cfg.token}']:
@@ -72,14 +73,14 @@ class ReleaseGateTests(unittest.TestCase):
             artifacts = root / 'packed'
             artifacts.mkdir()
             specifications = {
-                'dsh-voice-bridge-0.1.0.tgz': ('bridge', ['package.json','README.md','README.zh-TW.md','LICENSE','bridge.mjs']),
-                'dsh-voice-input-cloud-0.1.0.tgz': ('dsh-plugin', ['package.json','README.md','README.zh-TW.md','LICENSE','cordis.patch.yml','lib/index.js','lib/client.js'])}
+                'dsh-voice-bridge-0.1.1.tgz': ('bridge', ['package.json','README.md','README.zh-TW.md','LICENSE','bridge.mjs','recording-history.mjs']),
+                'dsh-voice-input-cloud-0.1.1.tgz': ('dsh-plugin', ['package.json','README.md','README.zh-TW.md','LICENSE','cordis.patch.yml','lib/index.js','lib/client.js'])}
             try:
                 rows = []
                 for name, (subdir, files) in specifications.items():
                     with tarfile.open(artifacts / name, 'w:gz') as archive:
                         for relative in files:
-                            content = b'{}' if relative.endswith('.json') else b'synthetic reviewed source'
+                            content = json.dumps({'version': '0.1.1'}).encode() if relative.endswith('.json') else b'synthetic reviewed source'
                             target = gate.ROOT / subdir / relative
                             target.parent.mkdir(parents=True, exist_ok=True)
                             target.write_bytes(content)
